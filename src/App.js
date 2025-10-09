@@ -119,7 +119,7 @@ const App = () => {
       }
     } catch (error) {
       console.error('Error loading events:', error);
-      alert('Error loading events. Check console.');
+      window.alert('Error loading events. Check console.');
     }
   };
 
@@ -151,7 +151,7 @@ const App = () => {
 
   const handleRegister = async () => {
     if (!formData.name || !formData.age || !selectedEventId) {
-      alert('Please fill in required fields and select an event');
+      window.alert('Please fill in required fields and select an event');
       return;
     }
 
@@ -202,7 +202,7 @@ const App = () => {
       setCurrentGuest(guestWithId);
     } catch (error) {
       console.error('Error registering guest:', error);
-      alert('Error registering guest. Please try again.');
+      window.alert('Error registering guest. Please try again.');
     }
   };
 
@@ -221,12 +221,12 @@ const App = () => {
     const totalVotes = Object.values(poll.votes || {}).reduce((a, b) => a + b, 0);
 
     if (poll.votedGuests?.includes(currentGuest.id)) {
-      alert('You have already voted on this poll!');
+      window.alert('You have already voted on this poll!');
       return;
     }
 
     if (totalVotes >= poll.maxVotes) {
-      alert('Maximum votes reached for this poll!');
+      window.alert('Maximum votes reached for this poll!');
       return;
     }
 
@@ -255,7 +255,7 @@ const App = () => {
       });
     } catch (error) {
       console.error('Error voting:', error);
-      alert('Error submitting vote. Please try again.');
+      window.alert('Error submitting vote. Please try again.');
     }
   };
 
@@ -275,10 +275,10 @@ const App = () => {
 
       const docRef = await addDoc(collection(db, 'events'), newEvent);
       setSelectedEventId(docRef.id);
-      alert(`Event "${newName}" created successfully!`);
+      window.alert(`Event "${newName}" created successfully!`);
     } catch (error) {
       console.error('Error creating event:', error);
-      alert('Error creating event. Please try again.');
+      window.alert('Error creating event. Please try again.');
     }
   };
 
@@ -298,16 +298,16 @@ const App = () => {
         name: newName || event.name,
         date: newDate || event.date
       });
-      alert('Event updated successfully!');
+      window.alert('Event updated successfully!');
     } catch (error) {
       console.error('Error updating event:', error);
-      alert('Error updating event. Please try again.');
+      window.alert('Error updating event. Please try again.');
     }
   };
 
   const deleteEvent = async () => {
     if (events.length === 1) {
-      alert('Cannot delete the last event!');
+      window.alert('Cannot delete the last event!');
       return;
     }
 
@@ -319,7 +319,7 @@ const App = () => {
       ? `Are you sure you want to delete "${event.name}"? This will also remove ${eventGuestsCount} guest(s) and their data.`
       : `Are you sure you want to delete "${event.name}"?`;
 
-    if (!confirm(confirmMsg)) return;
+    if (!window.confirm(confirmMsg)) return;
 
     try {
       // Delete event
@@ -339,10 +339,10 @@ const App = () => {
 
       const remainingEvent = events.find(e => e.id !== selectedEventId);
       setSelectedEventId(remainingEvent.id);
-      alert('Event deleted successfully!');
+      window.alert('Event deleted successfully!');
     } catch (error) {
       console.error('Error deleting event:', error);
-      alert('Error deleting event. Please try again.');
+      window.alert('Error deleting event. Please try again.');
     }
   };
 
