@@ -384,7 +384,7 @@ const App = () => {
             <div className="grid md:grid-cols-2 gap-6">
               <button
                 onClick={() => setView('register')}
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-8 rounded-xl hover:shadow-lg transition-all transform hover:scale-105"
+                className="bg-gradient-to-r from-pink-500 to-rose-600 text-white p-8 rounded-xl hover:shadow-lg transition-all transform hover:scale-105"
               >
                 <UserPlus size={48} className="mb-4 mx-auto" />
                 <h3 className="text-2xl font-bold mb-2">Register as Guest</h3>
@@ -518,7 +518,7 @@ const App = () => {
 
               <button
                 onClick={handleRegister}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-lg font-semibold hover:shadow-lg transition-all transform hover:scale-105"
+                className="w-full bg-gradient-to-r from-pink-500 to-rose-600 text-white py-4 rounded-lg font-semibold hover:shadow-lg transition-all transform hover:scale-105"
               >
                 Complete Registration
               </button>
