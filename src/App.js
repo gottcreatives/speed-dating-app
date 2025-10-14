@@ -43,6 +43,7 @@ const App = () => {
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [registering, setRegistering] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -150,61 +151,71 @@ const App = () => {
   };
 
   const handleRegister = async () => {
-    if (!formData.name || !formData.age || !selectedEventId) {
-      window.alert('Please fill in required fields and select an event');
-      return;
+  if (!formData.name || !formData.age || !selectedEventId) {
+    window.alert('Please fill in required fields and select an event');
+    return;
+  }
+
+  // Prevent multiple submissions
+  if (registering) return;
+  
+  setRegistering(true);
+
+  try {
+    const guestId = `GUEST-${Date.now()}`;
+    const qrCode = `${window.location.origin}/guest/${guestId}`;
+    
+    const newGuest = {
+      name: formData.name,
+      age: formData.age,
+      important: formData.important,
+      goal: formData.goal,
+      eventId: selectedEventId,
+      registeredAt: new Date().toISOString(),
+      qrCode: qrCode,
+      guestId: guestId,
+      points: 0,
+      activities: []
+    };
+
+    const guestRef = await addDoc(collection(db, 'guests'), newGuest);
+    const guestWithId = { id: guestRef.id, ...newGuest };
+
+    // Calculate max votes
+    const eventGuestsCount = guests.filter(g => g.eventId === selectedEventId).length + 1;
+    const maxVotes = Math.max(1, eventGuestsCount - 1);
+
+    // Create poll for this guest
+    const newPoll = {
+      guestId: guestRef.id,
+      eventId: selectedEventId,
+      guestName: newGuest.name,
+      question: `Will you go out with ${newGuest.name}?`,
+      options: ['Yes', 'No', 'Maybe', 'Let me think about it'],
+      votes: {},
+      votedGuests: [],
+      maxVotes: maxVotes
+    };
+
+    await addDoc(collection(db, 'polls'), newPoll);
+
+    // Update maxVotes for all existing polls in this event
+    const eventPolls = polls.filter(p => p.eventId === selectedEventId);
+    for (const poll of eventPolls) {
+      const pollRef = doc(db, 'polls', poll.id);
+      await updateDoc(pollRef, { maxVotes: maxVotes });
     }
 
-    try {
-      const qrCode = `GUEST-${Date.now()}`;
-      const newGuest = {
-        name: formData.name,
-        age: formData.age,
-        important: formData.important,
-        goal: formData.goal,
-        eventId: selectedEventId,
-        registeredAt: new Date().toISOString(),
-        qrCode: qrCode,
-        points: 0,
-        activities: []
-      };
-
-      const guestRef = await addDoc(collection(db, 'guests'), newGuest);
-      const guestWithId = { id: guestRef.id, ...newGuest };
-
-      // Calculate max votes
-      const eventGuestsCount = guests.filter(g => g.eventId === selectedEventId).length + 1;
-      const maxVotes = Math.max(1, eventGuestsCount - 1);
-
-      // Create poll for this guest
-      const newPoll = {
-        guestId: guestRef.id,
-        eventId: selectedEventId,
-        guestName: newGuest.name,
-        question: `Will you go out with ${newGuest.name}?`,
-        options: ['Yes', 'No', 'Maybe', 'Let me think about it'],
-        votes: {},
-        votedGuests: [],
-        maxVotes: maxVotes
-      };
-
-      await addDoc(collection(db, 'polls'), newPoll);
-
-      // Update maxVotes for all existing polls in this event
-      const eventPolls = polls.filter(p => p.eventId === selectedEventId);
-      for (const poll of eventPolls) {
-        const pollRef = doc(db, 'polls', poll.id);
-        await updateDoc(pollRef, { maxVotes: maxVotes });
-      }
-
-      setFormData({ name: '', age: '', important: '', goal: '' });
-      setView('qr-display');
-      setCurrentGuest(guestWithId);
-    } catch (error) {
-      console.error('Error registering guest:', error);
-      window.alert('Error registering guest. Please try again.');
-    }
-  };
+    setFormData({ name: '', age: '', important: '', goal: '' });
+    setRegistering(false);
+    setView('qr-display');
+    setCurrentGuest(guestWithId);
+  } catch (error) {
+    console.error('Error registering guest:', error);
+    setRegistering(false);
+    window.alert('Error registering guest. Please try again.');
+  }
+};
 
   const handleQRScan = (guestId) => {
     const guest = guests.find(g => g.id === guestId);
@@ -428,11 +439,26 @@ const App = () => {
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100 p-8">
         <div className="max-w-2xl mx-auto">
           <button
-            onClick={() => setView('home')}
-            className="mb-6 text-indigo-600 hover:text-indigo-800 flex items-center gap-2"
-          >
-            <Home size={20} /> Back to Home
-          </button>
+  onClick={handleRegister}
+  disabled={registering}
+  className={`w-full py-4 rounded-lg font-semibold transition-all transform ${
+    registering
+      ? 'bg-gray-400 cursor-not-allowed'
+      : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg hover:scale-105'
+  } text-white flex items-center justify-center gap-2`}
+>
+  {registering ? (
+    <>
+      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      Registering...
+    </>
+  ) : (
+    'Complete Registration'
+  )}
+</button>
 
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="text-center mb-6 pb-6 border-b border-gray-200">
@@ -517,11 +543,33 @@ const App = () => {
               </div>
 
               <button
-                onClick={handleRegister}
-                className="w-full bg-gradient-to-r from-pink-500 to-rose-600 text-white py-4 rounded-lg font-semibold hover:shadow-lg transition-all transform hover:scale-105"
-              >
-                Complete Registration
-              </button>
+  onClick={handleRegister}
+  disabled={registering}
+  className={`w-full py-4 rounded-lg font-semibold transition-all relative overflow-hidden ${
+    registering
+      ? 'bg-gray-400 cursor-not-allowed'
+      : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg hover:scale-105'
+  } text-white`}
+>
+  {registering && (
+    <div className="absolute top-0 left-0 h-1 bg-white animate-pulse" 
+         style={{ width: '100%', animation: 'progress 2s ease-in-out' }}>
+    </div>
+  )}
+  <div className="flex items-center justify-center gap-2">
+    {registering ? (
+      <>
+        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Registering... Please wait
+      </>
+    ) : (
+      'Complete Registration'
+    )}
+  </div>
+</button>
             </div>
           </div>
         </div>
