@@ -226,49 +226,44 @@ const App = () => {
   };
 
   const handleVote = async (pollId, option) => {
-    const poll = polls.find(p => p.id === pollId);
-    if (!poll) return;
+  const poll = polls.find(p => p.id === pollId);
+  if (!poll) return;
 
-    const totalVotes = Object.values(poll.votes || {}).reduce((a, b) => a + b, 0);
+  // Check if already voted
+  if (poll.votedGuests?.includes(currentGuest.id)) {
+    window.alert('You have already voted on this poll!');
+    return;
+  }
 
-    if (poll.votedGuests?.includes(currentGuest.id)) {
-      window.alert('You have already voted on this poll!');
-      return;
-    }
+  try {
+    // Optimistic update - show immediately
+    setCurrentGuest({
+      ...currentGuest,
+      points: currentGuest.points + 10,
+      activities: [...(currentGuest.activities || []), 'Poll Participation']
+    });
 
-    if (totalVotes >= poll.maxVotes) {
-      window.alert('Maximum votes reached for this poll!');
-      return;
-    }
+    // Update Firebase in background
+    const updatedVotes = { ...(poll.votes || {}) };
+    updatedVotes[option] = (updatedVotes[option] || 0) + 1;
+    const updatedVotedGuests = [...(poll.votedGuests || []), currentGuest.id];
 
-    try {
-      const updatedVotes = { ...poll.votes };
-      updatedVotes[option] = (updatedVotes[option] || 0) + 1;
-      const updatedVotedGuests = [...(poll.votedGuests || []), currentGuest.id];
-
-      const pollRef = doc(db, 'polls', pollId);
-      await updateDoc(pollRef, {
+    await Promise.all([
+      updateDoc(doc(db, 'polls', pollId), {
         votes: updatedVotes,
         votedGuests: updatedVotedGuests
-      });
-
-      // Update guest points
-      const guestRef = doc(db, 'guests', currentGuest.id);
-      await updateDoc(guestRef, {
+      }),
+      updateDoc(doc(db, 'guests', currentGuest.id), {
         points: currentGuest.points + 10,
-        activities: [...currentGuest.activities, 'Poll Participation']
-      });
+        activities: [...(currentGuest.activities || []), 'Poll Participation']
+      })
+    ]);
 
-      setCurrentGuest({
-        ...currentGuest,
-        points: currentGuest.points + 10,
-        activities: [...currentGuest.activities, 'Poll Participation']
-      });
-    } catch (error) {
-      console.error('Error voting:', error);
-      window.alert('Error submitting vote. Please try again.');
-    }
-  };
+  } catch (error) {
+    console.error('Error voting:', error);
+    window.alert('Error submitting vote. Please try again.');
+  }
+};
 
   const createEvent = async () => {
     const newName = prompt('Enter event name:', 'New Event');
@@ -673,66 +668,43 @@ const App = () => {
           ) : (
             <div className="space-y-6">
               {availablePolls.map((poll) => {
-                const hasVoted = poll.votes && Object.values(poll.votes).reduce((a, b) => a + b, 0) > 0;
-                const totalVotes = Object.values(poll.votes || {}).reduce((a, b) => a + b, 0);
-                const votesRemaining = poll.maxVotes - totalVotes;
-                const isMaxReached = totalVotes >= poll.maxVotes;
-                const hasCurrentGuestVoted = poll.votedGuests?.includes(currentGuest.id);
+  const hasCurrentGuestVoted = poll.votedGuests?.includes(currentGuest.id);
 
                 return (
                   <div key={poll.id} className="bg-white rounded-2xl shadow-xl p-8">
                     <h3 className="text-2xl font-bold text-gray-800 mb-2">{poll.question}</h3>
                     <p className="text-sm text-gray-500 mb-6">
-                      {hasCurrentGuestVoted ? (
-                        <span className="text-green-600 font-semibold">✓ You have voted on this poll</span>
-                      ) : isMaxReached ? (
-                        <span className="text-red-600 font-semibold">Maximum votes reached ({totalVotes}/{poll.maxVotes})</span>
-                      ) : (
-                        <span>Votes: {totalVotes}/{poll.maxVotes} • {votesRemaining} remaining</span>
-                      )}
-                    </p>
+  {hasCurrentGuestVoted ? (
+    <span className="text-green-600 font-semibold">✓ You have voted on this poll</span>
+  ) : (
+    <span className="text-gray-600">Vote to earn 10 points!</span>
+  )}
+</p>
 
                     <div className="space-y-3">
-                      {poll.options.map((option, idx) => {
-                        const votes = poll.votes?.[option] || 0;
-                        const percentage = totalVotes > 0 ? (votes / totalVotes * 100).toFixed(0) : 0;
-
-                        return (
-                          <button
-                            key={idx}
-                            onClick={() => handleVote(poll.id, option)}
-                            disabled={isMaxReached || hasCurrentGuestVoted}
-                            className={`w-full text-left p-4 border-2 rounded-lg transition-all relative overflow-hidden ${isMaxReached || hasCurrentGuestVoted
-                                ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
-                                : 'border-gray-200 hover:border-indigo-500 hover:bg-indigo-50'
-                              }`}
-                          >
-                            {hasVoted && (
-                              <div
-                                className="absolute left-0 top-0 h-full bg-indigo-100 transition-all"
-                                style={{ width: `${percentage}%` }}
-                              />
-                            )}
-                            <div className="relative flex justify-between items-center">
-                              <span className="font-semibold text-gray-700">{option}</span>
-                              {hasVoted && (
-                                <span className="text-sm text-gray-600">{percentage}% ({votes} votes)</span>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
+  {poll.options.map((option, idx) => {
+    return (
+      <button
+        key={idx}
+        onClick={() => handleVote(poll.id, option)}
+        disabled={hasCurrentGuestVoted}
+        className={`w-full text-left p-4 border-2 rounded-lg transition-all ${
+          hasCurrentGuestVoted
+            ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+            : 'border-gray-200 hover:border-indigo-500 hover:bg-indigo-50'
+        }`}
+      >
+        <span className="font-semibold text-gray-700">{option}</span>
+      </button>
+    );
+  })}
+</div>
 
                     <p className="text-sm text-gray-500 mt-4 text-center">
-                      {hasCurrentGuestVoted
-                        ? 'Thank you for voting! +10 points earned'
-                        : isMaxReached
-                          ? 'Poll closed - Maximum votes reached!'
-                          : hasVoted
-                            ? `Total votes: ${totalVotes}/${poll.maxVotes}`
-                            : 'Vote to earn 10 points!'}
-                    </p>
+  {hasCurrentGuestVoted
+    ? 'Thank you for voting! +10 points earned'
+    : 'Cast your vote above'}
+</p>
                   </div>
                 );
               })}
