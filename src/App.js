@@ -44,6 +44,10 @@ const App = () => {
   const [selectedEventId, setSelectedEventId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [showPasswordError, setShowPasswordError] = useState(false);
+  const ADMIN_PASSWORD = 'soci@lAlch3mist!';
 
   const [formData, setFormData] = useState({
     name: '',
@@ -51,6 +55,22 @@ const App = () => {
     important: '',
     goal: ''
   });
+
+// Persist authentication
+useEffect(() => {
+  const savedAuth = sessionStorage.getItem('adminAuth');
+  if (savedAuth === 'true') {
+    setIsAuthenticated(true);
+  }
+}, []);
+
+useEffect(() => {
+  if (isAuthenticated) {
+    sessionStorage.setItem('adminAuth', 'true');
+  } else {
+    sessionStorage.removeItem('adminAuth');
+  }
+}, [isAuthenticated]);
 
   // Load data from Firebase on mount
  useEffect(() => {
@@ -377,6 +397,86 @@ const App = () => {
     );
   }
 
+const renderLogin = () => {
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (adminPassword === ADMIN_PASSWORD) {
+      setIsAuthenticated(true);
+      setShowPasswordError(false);
+      setAdminPassword('');
+    } else {
+      setShowPasswordError(true);
+      setAdminPassword('');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center p-8">
+      <div className="max-w-md w-full">
+        <div className="bg-white rounded-2xl shadow-2xl p-8">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Users className="text-white" size={40} />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Event Organizer Login</h1>
+            <p className="text-gray-600">Enter password to access admin panel</p>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Admin Password
+              </label>
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(e) => {
+                  setAdminPassword(e.target.value);
+                  setShowPasswordError(false);
+                }}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleLogin(e);
+                  }
+                }}
+                className={`w-full p-3 border-2 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                  showPasswordError ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="Enter password"
+                autoFocus
+              />
+              {showPasswordError && (
+                <p className="text-red-500 text-sm mt-2">
+                  ❌ Incorrect password. Please try again.
+                </p>
+              )}
+            </div>
+
+            <button
+              onClick={handleLogin}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all transform hover:scale-105"
+            >
+              Login as Organizer
+            </button>
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <p className="text-sm text-gray-600 text-center mb-3">
+              Are you a guest?
+            </p>
+            
+              href="/"
+              className="block text-center text-indigo-600 hover:text-indigo-800 font-semibold"
+            >
+              Scan your QR code to access your page
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
   const renderHome = () => {
     const currentEvent = events.find(e => e.id === selectedEventId);
 
@@ -631,14 +731,8 @@ const App = () => {
     const availablePolls = polls.filter(p => p.eventId === currentGuest.eventId && p.guestId !== currentGuest.id);
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-8">
-        <div className="max-w-4xl mx-auto">
-          <button
-            onClick={() => setView('home')}
-            className="mb-6 text-purple-600 hover:text-purple-800 flex items-center gap-2"
-          >
-            <Home size={20} /> Back to Home
-          </button>
+<div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-8">
+  <div className="max-w-4xl mx-auto">
 
           <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
             <div className="flex items-center justify-between mb-6">
@@ -857,12 +951,24 @@ const App = () => {
           </button>
 
           <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h2 className="text-3xl font-bold text-gray-800 mb-2">Admin Dashboard</h2>
-                <p className="text-gray-600">Manage your event and view guest analytics</p>
-              </div>
-            </div>
+  <div className="flex justify-between items-start mb-6">
+  <div>
+    <h2 className="text-3xl font-bold text-gray-800 mb-2">Admin Dashboard</h2>
+    <p className="text-gray-600">Manage your event and view guest analytics</p>
+  </div>
+  <button
+    onClick={() => {
+      setIsAuthenticated(false);
+      setView('home');
+    }}
+    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition flex items-center gap-2"
+  >
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+    </svg>
+    Logout
+  </button>
+</div>
 
             <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl p-6 mb-8">
               <div className="flex justify-between items-center mb-4">
@@ -1008,15 +1114,16 @@ const App = () => {
     );
   };
 
-  return (
-    <div className="font-sans">
-      {view === 'home' && renderHome()}
-      {view === 'register' && renderRegister()}
-      {view === 'qr-display' && renderQRDisplay()}
-      {view === 'interactive' && renderInteractive()}
-      {view === 'admin' && renderAdmin()}
-    </div>
-  );
-};
+return (
+  <div className="font-sans">
+    {view === 'login' && renderLogin()}
+    {view === 'home' && renderHome()}
+    {view === 'register' && renderRegister()}
+    {view === 'qr-display' && renderQRDisplay()}
+    {view === 'interactive' && renderInteractive()}
+    {view === 'admin' && (isAuthenticated ? renderAdmin() : renderLogin())}
+  </div>
+);
+
 
 export default App;
