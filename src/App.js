@@ -53,11 +53,24 @@ const App = () => {
   });
 
   // Load data from Firebase on mount
-  useEffect(() => {
-    loadEvents();
-    loadGuests();
-    loadPolls();
-  }, []);
+ useEffect(() => {
+  // Handle QR code scanning URLs
+  const path = window.location.pathname;
+  if (path.startsWith('/guest/')) {
+    const guestIdFromUrl = path.replace('/guest/', '');
+    console.log('Looking for guest with ID:', guestIdFromUrl);
+    
+    // Find guest by guestId
+    const guest = guests.find(g => g.guestId === guestIdFromUrl);
+    if (guest) {
+      console.log('Found guest:', guest.name);
+      setCurrentGuest(guest);
+      setView('interactive');
+    } else {
+      console.log('Guest not found, available guests:', guests.length);
+    }
+  }
+}, [guests]);
 
   // Real-time listeners for data updates
   useEffect(() => {
@@ -176,7 +189,6 @@ const App = () => {
       guestId: guestId,
       points: 0,
       activities: []
-      voteChoices: {} 
     };
 
     const guestRef = await addDoc(collection(db, 'guests'), newGuest);
@@ -219,16 +231,12 @@ const App = () => {
 };
 
   const handleQRScan = (guestId) => {
-  const guest = guests.find(g => g.id === guestId);
-  if (guest) {
-    // Ensure voteChoices exists for older guests
-    setCurrentGuest({
-      ...guest,
-      voteChoices: guest.voteChoices || {}
-    });
-    setView('interactive');
-  }
-};
+    const guest = guests.find(g => g.id === guestId);
+    if (guest) {
+      setCurrentGuest(guest);
+      setView('interactive');
+    }
+  };
 
   const handleVote = async (pollId, option) => {
   const poll = polls.find(p => p.id === pollId);
@@ -241,18 +249,11 @@ const App = () => {
   }
 
   try {
-    // Optimistic update - show immediately with vote choice
-    const updatedActivities = [...(currentGuest.activities || []), 'Poll Participation'];
-    const updatedVoteChoices = {
-      ...(currentGuest.voteChoices || {}),
-      [pollId]: option  // Store which option they chose
-    };
-
+    // Optimistic update - show immediately
     setCurrentGuest({
       ...currentGuest,
       points: currentGuest.points + 10,
-      activities: updatedActivities,
-      voteChoices: updatedVoteChoices
+      activities: [...(currentGuest.activities || []), 'Poll Participation']
     });
 
     // Update Firebase in background
@@ -267,8 +268,7 @@ const App = () => {
       }),
       updateDoc(doc(db, 'guests', currentGuest.id), {
         points: currentGuest.points + 10,
-        activities: updatedActivities,
-        voteChoices: updatedVoteChoices
+        activities: [...(currentGuest.activities || []), 'Poll Participation']
       })
     ]);
 
@@ -628,122 +628,105 @@ const App = () => {
   );
 
   const renderInteractive = () => {
-  const availablePolls = polls.filter(p => p.eventId === currentGuest.eventId && p.guestId !== currentGuest.id);
+    const availablePolls = polls.filter(p => p.eventId === currentGuest.eventId && p.guestId !== currentGuest.id);
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-8">
-      <div className="max-w-4xl mx-auto">
-        <button
-          onClick={() => setView('home')}
-          className="mb-6 text-purple-600 hover:text-purple-800 flex items-center gap-2"
-        >
-          <Home size={20} /> Back to Home
-        </button>
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-8">
+        <div className="max-w-4xl mx-auto">
+          <button
+            onClick={() => setView('home')}
+            className="mb-6 text-purple-600 hover:text-purple-800 flex items-center gap-2"
+          >
+            <Home size={20} /> Back to Home
+          </button>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-800">Welcome, {currentGuest?.name}!</h2>
-              <p className="text-gray-600">Age: {currentGuest?.age}</p>
+          <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-3xl font-bold text-gray-800">Welcome, {currentGuest?.name}!</h2>
+                <p className="text-gray-600">Age: {currentGuest?.age}</p>
+              </div>
+              <div className="text-center bg-gradient-to-br from-yellow-400 to-orange-500 text-white px-6 py-3 rounded-xl">
+                <Award size={24} className="mx-auto mb-1" />
+                <p className="text-2xl font-bold">{currentGuest?.points}</p>
+                <p className="text-xs">Points</p>
+              </div>
             </div>
-            <div className="text-center bg-gradient-to-br from-yellow-400 to-orange-500 text-white px-6 py-3 rounded-xl">
-              <Award size={24} className="mx-auto mb-1" />
-              <p className="text-2xl font-bold">{currentGuest?.points}</p>
-              <p className="text-xs">Points</p>
+
+            <div className="grid md:grid-cols-3 gap-4 mb-6">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <QrCode className="text-blue-600 mb-2" size={24} />
+                <p className="text-sm text-gray-600">QR Code</p>
+                <p className="font-mono text-xs text-gray-500">{currentGuest?.qrCode}</p>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <Activity className="text-green-600 mb-2" size={24} />
+                <p className="text-sm text-gray-600">Activities</p>
+                <p className="font-bold text-lg">{currentGuest?.activities?.length || 0}</p>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <Share2 className="text-purple-600 mb-2" size={24} />
+                <p className="text-sm text-gray-600">Engagement</p>
+                <p className="font-bold text-lg">{currentGuest?.points > 0 ? 'Active' : 'New'}</p>
+              </div>
             </div>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <QrCode className="text-blue-600 mb-2" size={24} />
-              <p className="text-sm text-gray-600">QR Code</p>
-              <p className="font-mono text-xs text-gray-500">{currentGuest?.qrCode}</p>
+          {availablePolls.length === 0 ? (
+            <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
+              <Users className="mx-auto mb-4 text-gray-400" size={64} />
+              <h3 className="text-2xl font-bold text-gray-800 mb-2">No Polls Available Yet</h3>
+              <p className="text-gray-600">Wait for other guests to register to see their polls!</p>
             </div>
-            <div className="bg-green-50 p-4 rounded-lg">
-              <Activity className="text-green-600 mb-2" size={24} />
-              <p className="text-sm text-gray-600">Activities</p>
-              <p className="font-bold text-lg">{currentGuest?.activities?.length || 0}</p>
-            </div>
-            <div className="bg-purple-50 p-4 rounded-lg">
-              <Share2 className="text-purple-600 mb-2" size={24} />
-              <p className="text-sm text-gray-600">Engagement</p>
-              <p className="font-bold text-lg">{currentGuest?.points > 0 ? 'Active' : 'New'}</p>
-            </div>
-          </div>
-        </div>
+          ) : (
+            <div className="space-y-6">
+              {availablePolls.map((poll) => {
+  const hasCurrentGuestVoted = poll.votedGuests?.includes(currentGuest.id);
 
-        {availablePolls.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
-            <Users className="mx-auto mb-4 text-gray-400" size={64} />
-            <h3 className="text-2xl font-bold text-gray-800 mb-2">No Polls Available Yet</h3>
-            <p className="text-gray-600">Wait for other guests to register to see their polls!</p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {availablePolls.map((poll) => {
-              const hasCurrentGuestVoted = poll.votedGuests?.includes(currentGuest.id);
-              const guestChoice = currentGuest.voteChoices?.[poll.id];
+                return (
+                  <div key={poll.id} className="bg-white rounded-2xl shadow-xl p-8">
+                    <h3 className="text-2xl font-bold text-gray-800 mb-2">{poll.question}</h3>
+                    <p className="text-sm text-gray-500 mb-6">
+  {hasCurrentGuestVoted ? (
+    <span className="text-green-600 font-semibold">✓ You have voted on this poll</span>
+  ) : (
+    <span className="text-gray-600">Vote to earn 10 points!</span>
+  )}
+</p>
 
-              return (
-                <div key={poll.id} className="bg-white rounded-2xl shadow-xl p-8">
-                  <h3 className="text-2xl font-bold text-gray-800 mb-2">{poll.question}</h3>
-                  <p className="text-sm text-gray-500 mb-6">
-                    {hasCurrentGuestVoted ? (
-                      <span className="text-green-600 font-semibold">✓ You have voted on this poll</span>
-                    ) : (
-                      <span className="text-gray-600">Vote to earn 10 points!</span>
-                    )}
-                  </p>
+                    <div className="space-y-3">
+  {poll.options.map((option, idx) => {
+    return (
+      <button
+        key={idx}
+        onClick={() => handleVote(poll.id, option)}
+        disabled={hasCurrentGuestVoted}
+        className={`w-full text-left p-4 border-2 rounded-lg transition-all ${
+          hasCurrentGuestVoted
+            ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+            : 'border-gray-200 hover:border-indigo-500 hover:bg-indigo-50'
+        }`}
+      >
+        <span className="font-semibold text-gray-700">{option}</span>
+      </button>
+    );
+  })}
+</div>
 
-                  <div className="space-y-3">
-                    {poll.options.map((option, idx) => {
-                      const isGuestChoice = guestChoice === option;
-                      
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => handleVote(poll.id, option)}
-                          disabled={hasCurrentGuestVoted}
-                          className={`w-full text-left p-4 border-2 rounded-lg transition-all relative ${
-                            hasCurrentGuestVoted
-                              ? isGuestChoice
-                                ? 'border-green-500 bg-green-50'
-                                : 'border-gray-200 bg-gray-50 opacity-60'
-                              : 'border-gray-200 hover:border-indigo-500 hover:bg-indigo-50'
-                          } ${hasCurrentGuestVoted ? 'cursor-not-allowed' : ''}`}
-                        >
-                          <div className="flex justify-between items-center">
-                            <span className={`font-semibold ${isGuestChoice ? 'text-green-700' : 'text-gray-700'}`}>
-                              {option}
-                            </span>
-                            {isGuestChoice && (
-                              <span className="flex items-center gap-2 text-green-600 text-sm font-semibold">
-                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                </svg>
-                                Your Vote
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
+                    <p className="text-sm text-gray-500 mt-4 text-center">
+  {hasCurrentGuestVoted
+    ? 'Thank you for voting! +10 points earned'
+    : 'Cast your vote above'}
+</p>
                   </div>
-
-                  <p className="text-sm text-gray-500 mt-4 text-center">
-                    {hasCurrentGuestVoted
-                      ? `You voted: "${guestChoice}" • +10 points earned`
-                      : 'Cast your vote above'}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   const renderAdmin = () => {
     const currentEvent = events.find(e => e.id === selectedEventId);
