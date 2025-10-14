@@ -176,6 +176,7 @@ const App = () => {
       guestId: guestId,
       points: 0,
       activities: []
+      voteChoices: {} 
     };
 
     const guestRef = await addDoc(collection(db, 'guests'), newGuest);
@@ -218,12 +219,16 @@ const App = () => {
 };
 
   const handleQRScan = (guestId) => {
-    const guest = guests.find(g => g.id === guestId);
-    if (guest) {
-      setCurrentGuest(guest);
-      setView('interactive');
-    }
-  };
+  const guest = guests.find(g => g.id === guestId);
+  if (guest) {
+    // Ensure voteChoices exists for older guests
+    setCurrentGuest({
+      ...guest,
+      voteChoices: guest.voteChoices || {}
+    });
+    setView('interactive');
+  }
+};
 
   const handleVote = async (pollId, option) => {
   const poll = polls.find(p => p.id === pollId);
@@ -236,11 +241,18 @@ const App = () => {
   }
 
   try {
-    // Optimistic update - show immediately
+    // Optimistic update - show immediately with vote choice
+    const updatedActivities = [...(currentGuest.activities || []), 'Poll Participation'];
+    const updatedVoteChoices = {
+      ...(currentGuest.voteChoices || {}),
+      [pollId]: option  // Store which option they chose
+    };
+
     setCurrentGuest({
       ...currentGuest,
       points: currentGuest.points + 10,
-      activities: [...(currentGuest.activities || []), 'Poll Participation']
+      activities: updatedActivities,
+      voteChoices: updatedVoteChoices
     });
 
     // Update Firebase in background
@@ -255,7 +267,8 @@ const App = () => {
       }),
       updateDoc(doc(db, 'guests', currentGuest.id), {
         points: currentGuest.points + 10,
-        activities: [...(currentGuest.activities || []), 'Poll Participation']
+        activities: updatedActivities,
+        voteChoices: updatedVoteChoices
       })
     ]);
 
@@ -669,51 +682,62 @@ const App = () => {
             <div className="space-y-6">
               {availablePolls.map((poll) => {
   const hasCurrentGuestVoted = poll.votedGuests?.includes(currentGuest.id);
+  const guestChoice = currentGuest.voteChoices?.[poll.id];
 
-                return (
-                  <div key={poll.id} className="bg-white rounded-2xl shadow-xl p-8">
-                    <h3 className="text-2xl font-bold text-gray-800 mb-2">{poll.question}</h3>
-                    <p className="text-sm text-gray-500 mb-6">
-  {hasCurrentGuestVoted ? (
-    <span className="text-green-600 font-semibold">✓ You have voted on this poll</span>
-  ) : (
-    <span className="text-gray-600">Vote to earn 10 points!</span>
-  )}
-</p>
+  return (
+    <div key={poll.id} className="bg-white rounded-2xl shadow-xl p-8">
+      <h3 className="text-2xl font-bold text-gray-800 mb-2">{poll.question}</h3>
+      <p className="text-sm text-gray-500 mb-6">
+        {hasCurrentGuestVoted ? (
+          <span className="text-green-600 font-semibold">✓ You have voted on this poll</span>
+        ) : (
+          <span className="text-gray-600">Vote to earn 10 points!</span>
+        )}
+      </p>
 
-                    <div className="space-y-3">
-  {poll.options.map((option, idx) => {
-    return (
-      <button
-        key={idx}
-        onClick={() => handleVote(poll.id, option)}
-        disabled={hasCurrentGuestVoted}
-        className={`w-full text-left p-4 border-2 rounded-lg transition-all ${
-          hasCurrentGuestVoted
-            ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
-            : 'border-gray-200 hover:border-indigo-500 hover:bg-indigo-50'
-        }`}
-      >
-        <span className="font-semibold text-gray-700">{option}</span>
-      </button>
-    );
-  })}
-</div>
-
-                    <p className="text-sm text-gray-500 mt-4 text-center">
-  {hasCurrentGuestVoted
-    ? 'Thank you for voting! +10 points earned'
-    : 'Cast your vote above'}
-</p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+      <div className="space-y-3">
+        {poll.options.map((option, idx) => {
+          const isGuestChoice = guestChoice === option;
+          
+          return (
+            <button
+              key={idx}
+              onClick={() => handleVote(poll.id, option)}
+              disabled={hasCurrentGuestVoted}
+              className={`w-full text-left p-4 border-2 rounded-lg transition-all relative ${
+                hasCurrentGuestVoted
+                  ? isGuestChoice
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-gray-200 bg-gray-50 opacity-60'
+                  : 'border-gray-200 hover:border-indigo-500 hover:bg-indigo-50'
+              } ${hasCurrentGuestVoted ? 'cursor-not-allowed' : ''}`}
+            >
+              <div className="flex justify-between items-center">
+                <span className={`font-semibold ${isGuestChoice ? 'text-green-700' : 'text-gray-700'}`}>
+                  {option}
+                </span>
+                {isGuestChoice && (
+                  <span className="flex items-center gap-2 text-green-600 text-sm font-semibold">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    Your Vote
+                  </span>
+                )}
+              </div>
+            </button>
+          );
+        })}
       </div>
-    );
-  };
+
+      <p className="text-sm text-gray-500 mt-4 text-center">
+        {hasCurrentGuestVoted
+          ? `You voted: "${guestChoice}" • +10 points earned`
+          : 'Cast your vote above'}
+      </p>
+    </div>
+  );
+})}
 
   const renderAdmin = () => {
     const currentEvent = events.find(e => e.id === selectedEventId);
