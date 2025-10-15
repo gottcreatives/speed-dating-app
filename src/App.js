@@ -469,7 +469,6 @@ const renderLogin = () => {
               className="block text-center text-indigo-600 hover:text-indigo-800 font-semibold"
             >
               Scan your QR code to access your page
-            </a>
           </div>
         </div>
       </div>
@@ -1123,7 +1122,7 @@ return (
     {view === 'interactive' && renderInteractive()}
     {view === 'admin' && (isAuthenticated ? renderAdmin() : renderLogin())}
   </div>
-);
-
+ );
+};
 
 export default App;
