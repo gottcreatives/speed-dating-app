@@ -459,17 +459,6 @@ const renderLogin = () => {
               Login as Organizer
             </button>
           </div>
-
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <p className="text-sm text-gray-600 text-center mb-3">
-              Are you a guest?
-            </p>
-            
-              href="/"
-              className="block text-center text-indigo-600 hover:text-indigo-800 font-semibold"
-            >
-              Scan your QR code to access your page
-          </div>
         </div>
       </div>
     </div>
@@ -518,21 +507,6 @@ const renderLogin = () => {
                 <p className="text-purple-100">Manage guests and view analytics</p>
               </button>
             </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <h3 className="font-semibold text-gray-700 mb-4">Demo QR Scan</h3>
-            <p className="text-gray-600 mb-4">In production, guests would scan their QR code. For demo, select a guest:</p>
-            <select
-              className="w-full p-3 border border-gray-300 rounded-lg"
-              onChange={(e) => e.target.value && handleQRScan(e.target.value)}
-              defaultValue=""
-            >
-              <option value="">Select a registered guest...</option>
-              {guests.filter(g => g.eventId === selectedEventId).map(guest => (
-                <option key={guest.id} value={guest.id}>{guest.name}</option>
-              ))}
-            </select>
           </div>
         </div>
       </div>
